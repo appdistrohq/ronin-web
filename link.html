@@ -48,7 +48,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  const sb = supabase.createClient("__SUPABASE_URL__", "__SUPABASE_ANON_KEY__");
+  const sb = supabase.createClient("https://ctluakbpzyknlrwokreo.supabase.co", "sb_publishable_e5_mN-HJFGYFgViGw5gUXA_jER0Fcb1");
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
   const prefill = (params.get("code") || "").toUpperCase();
