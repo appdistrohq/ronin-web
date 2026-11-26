@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ronin — Sign in your TV</title>
+<style>
+  body { margin:0; background:#0a0a0a; color:#f2f2f2; font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .wrap { max-width:420px; margin:0 auto; padding:32px 20px 48px; }
+  h1 { font-size:24px; margin:0 0 6px; }
+  h1 .o { color:#E02020; }
+  p.sub { color:#bdbdbd; margin:0 0 24px; font-size:15px; line-height:1.45; }
+  label { display:block; font-size:13px; color:#bdbdbd; margin:16px 0 6px; }
+  input { width:100%; box-sizing:border-box; padding:12px; font-size:16px; border-radius:8px; border:1px solid #333; background:#161616; color:#f2f2f2; }
+  input.code { text-transform:uppercase; letter-spacing:3px; font-size:22px; text-align:center; }
+  button { width:100%; margin-top:20px; padding:13px; font-size:16px; font-weight:600; border:0; border-radius:8px; background:#E02020; color:#fff; cursor:pointer; }
+  button:disabled { opacity:.55; cursor:default; }
+  .msg { margin-top:16px; font-size:14px; line-height:1.45; min-height:20px; }
+  .msg.err { color:#ff7b72; }
+  .msg.ok { color:#7ee2a0; }
+  .who { margin-top:22px; font-size:13px; color:#8a8a8a; }
+  .who a { color:#bdbdbd; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>R<span class="o">O</span>NIN</h1>
+  <p class="sub">Sign in your TV. First sign in here with your Ronin account, then enter the code shown on your TV screen.</p>
+
+  <div id="signinBox">
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <button id="signinBtn">Sign in</button>
+    <div id="signinMsg" class="msg"></div>
+  </div>
+
+  <div id="approveBox" class="hidden">
+    <label for="code">Code from your TV</label>
+    <input id="code" class="code" type="text" maxlength="7" autocomplete="off" placeholder="XXX-XXX">
+    <button id="approveBtn">Approve sign-in</button>
+    <div id="approveMsg" class="msg"></div>
+    <div class="who">Signed in as <span id="whoEmail"></span> · <a href="#" id="signoutLink">Sign out</a></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const sb = supabase.createClient("__SUPABASE_URL__", "__SUPABASE_ANON_KEY__");
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const prefill = (params.get("code") || "").toUpperCase();
+  if (prefill) $("code").value = prefill;
+
+  function showApprove(email) {
+    $("signinBox").classList.add("hidden");
+    $("approveBox").classList.remove("hidden");
+    $("whoEmail").textContent = email || "";
+  }
+
+  sb.auth.getSession().then(({ data }) => {
+    if (data.session) showApprove(data.session.user.email);
+  });
+
+  $("signinBtn").addEventListener("click", async () => {
+    const btn = $("signinBtn"), msg = $("signinMsg");
+    msg.textContent = ""; msg.className = "msg";
+    btn.disabled = true;
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: $("email").value.trim(),
+      password: $("password").value,
+    });
+    btn.disabled = false;
+    if (error) { msg.textContent = error.message; msg.classList.add("err"); return; }
+    showApprove(data.user.email);
+  });
+
+  $("approveBtn").addEventListener("click", async () => {
+    const btn = $("approveBtn"), msg = $("approveMsg");
+    const code = $("code").value.trim();
+    msg.textContent = ""; msg.className = "msg";
+    if (!code) { msg.textContent = "Enter the code shown on your TV."; msg.classList.add("err"); return; }
+    btn.disabled = true;
+    const { data, error } = await sb.rpc("approve_tv_login_session", { p_user_code: code });
+    btn.disabled = false;
+    if (error) { msg.textContent = error.message; msg.classList.add("err"); return; }
+    if (data === true) {
+      msg.textContent = "Approved — your TV is signing in now. You can put your phone down.";
+      msg.classList.add("ok");
+    } else {
+      msg.textContent = "That code was not found. Check it matches your TV exactly — codes expire after 10 minutes.";
+      msg.classList.add("err");
+    }
+  });
+
+  $("signoutLink").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await sb.auth.signOut();
+    location.reload();
+  });
+</script>
+</body>
+</html>
